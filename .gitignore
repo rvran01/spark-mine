@@ -15,8 +15,5 @@ project/plugins/project/
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
+.classpath
 
-#activator
-activator-launch-1.2.12.jar
-activator
-activator.bat
