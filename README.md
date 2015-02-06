@@ -5,3 +5,4 @@ The motivation: [Playing with some free files to do some map reduce stuff operat
 
 ###  LIST
 * BigFileCounter
+* Movie Rating
