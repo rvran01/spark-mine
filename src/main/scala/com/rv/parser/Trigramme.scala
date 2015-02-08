@@ -3,7 +3,7 @@ package com.rv.parser
 object Trigramme {
   
 	def perThree(line: String) = {
-    val elt = line.toLowerCase()
+    val elt = line.toUpperCase()
 		val numberTrig = line.length()-2
 		var list = List.empty[String]
 		for (i <- 0 to numberTrig-1){
@@ -14,6 +14,6 @@ object Trigramme {
 	}
   
   def decoupe(line: String, size: Int) = {
-    line.toLowerCase().sliding(size, step=1).toList
+    line.toUpperCase().sliding(size, step=1).toList
   }
 }

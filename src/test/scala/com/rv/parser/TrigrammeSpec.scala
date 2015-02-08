@@ -9,19 +9,19 @@ class TrigrammeSpec extends FlatSpec {
   }
   
   it should "contain 1 elements in list" in {
-    assert(1 == (Trigramme.perThree("hel").size))    
+    assert(1 == (Trigramme.perThree("HEL").size))    
   }
   
   it should "contain 9 elements in list after decoupe" in {
     val res = Trigramme.decoupe("hello world", 3)
     assert(9 == (res.size))
-    assert(res.contains("hel"))
-    assert(res.contains("ell"))
-    assert(res.contains("llo"))
-    assert(res.contains("lo "))
-    assert(res.contains("o w"))
-    assert(res.contains(" wo"))
-    assert(res.contains("rld"))
+    assert(res.contains("HEL"))
+    assert(res.contains("ELL"))
+    assert(res.contains("LLO"))
+    assert(res.contains("LO "))
+    assert(res.contains("O W"))
+    assert(res.contains(" WO"))
+    assert(res.contains("RLD"))
   }
   
   it should "contain the same elements : methods decoupe and perThree" in {
