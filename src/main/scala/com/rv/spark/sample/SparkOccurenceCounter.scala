@@ -59,6 +59,43 @@ object SparkOccurenceCounter {
     }
   }
   
+  /**
+   * compute the sum of occurences of trigramme for each candidate line
+   * for each candidate line, call decoupe and for each trigramme some occurences
+   */
+  def sumOccurences(candidateLine : String, references : Map[String, KeyOccurences]) = {
+    Trigramme.decoupe(candidateLine, size=3)
+      .map { t => getReference(references, toCheck = t).occurencesOpt }
+      .flatten.foldLeft(0)(_+_)
+  }
+  
+  /**
+   * apply research on candidate file - take distinct elements (trigramme)
+   * compute each distinct trigramme of the file
+   */
+  def parseCandidatesTrigrammeWithReference(candidateLinesRDD : RDD[String], references : Map[String, KeyOccurences]) = {
+    val candidates = candidateLinesRDD.flatMap ( line => Trigramme.decoupe(line, size=3) ).distinct()
+    val results = outputFormat(candidates.toLocalIterator.toList.map (c => getReference(references, toCheck = c) ), ":")
+    results
+  }
+    
+  def outputFormat(list : List[Reference], separator: String) : List[String]= {
+    list.map { l =>
+      "key["+ l.key +"]" + separator + "occurences["+ l.occurencesOpt.getOrElse(-1) + "]" + separator + "indice[" + l.indiceOpt.getOrElse(-1) + "]"
+    }
+  }
+  /**
+   * Return per candidateLine the max by occurences sum (sign, sum)
+   */
+  def checkBestProfileSignPerCandidateLine(candidateLine : String, referencesList : Map[String, Map[String, KeyOccurences]]) : (String, Int) = {
+    val sumOccurencesPerSign = referencesList.map(f => {
+      val sign = f._1
+      (sign, sumOccurences(candidateLine , references = f._2))
+    })
+    //get the max sum of occurences beetween signs
+    sumOccurencesPerSign.maxBy(f=> f._2)
+  }
+  
   def main(args: Array[String]) {
  
     def printKeySearch(filename : String, keyToSearch : String, reference : Reference) = {
@@ -72,33 +109,43 @@ object SparkOccurenceCounter {
       
     val ctx = new SparkContext(sparkConf)
     //val showNumber = 10
-    val filename4 = "/home/maya/data/fidmarques/d_export_4.txt"
-    //compute(ctx, filename4, showNumber)
     
-    val result4RDD = ctx.parallelize(seq=Seq(getKeysWithOccurences(ctx, filename4)), numSlices=10).cache()
-    val references = result4RDD.first().sortedDescKeyByOccurences
-  
     /*val toCheck1 = "0G "
     printKeySearch(filename = filename4, keyToSearch = toCheck1, reference = getReference(sortedDescKeyByOccurences = keyOccurences, toCheck1))
     */
   
-    //apply research on candidate file - take distinct elements
+    //store candidates - distinct elements
     val candidateLinesRDD = ctx.textFile(path="/home/maya/data/fidmarques/d_export_candidate.txt", minPartitions=3)
-    val candidates = candidateLinesRDD.flatMap ( line => Trigramme.decoupe(line, size=3) ).distinct()
-    //candidates.foreach { c => printKeySearch(filename = filename4, keyToSearch = c, referenceOpt = getReference(result = result4RDD.first(), c)) }
-    def outputFormat(list : List[Reference], separator: String) : List[String]= {
-	    list.map { l =>
-        "key["+ l.key +"]" + separator + "occurences["+ l.occurencesOpt.getOrElse(-1) + "]" + separator + "indice[" + l.indiceOpt.getOrElse(-1) + "]"
-      }
+    candidateLinesRDD.distinct().cache()
+    
+    def saveParseCandidatesWithReferences(ctx : SparkContext, toSaves : List[String], resultFilename : String) = {
+      val results = ctx.parallelize(seq = toSaves, numSlices = 1)
+      results.saveAsTextFile(resultFilename)
     }
-    val results = outputFormat( candidates.toLocalIterator.toList.map (c => getReference(references, toCheck = c) ), ":")
-    val resultsRDD = ctx.parallelize(seq=results.toSeq, numSlices = 1)
-    resultsRDD.saveAsTextFile("/home/maya/data/fidmarques/resultFrom4.txt" )
- 
-  
-    //val filename16 = "/home/maya/data/fidmarques/d_export_16.txt"
-    //compute(ctx, filename16, showNumber)
-  
+    
+    val filename4 = "/home/maya/data/fidmarques/d_export_4.txt"
+    val references4RDD = ctx.parallelize(seq=Seq(getKeysWithOccurences(ctx, filename4)), numSlices=10).cache()
+    //val results4 = parseCandidatesTrigrammeWithReference(candidateLinesRDD, references = references4RDD.first().sortedDescKeyByOccurences)
+    //saveParseCandidatesWithReferences(ctx, results4, "/home/maya/data/fidmarques/resultFrom4.txt")
+    
+    val filename16 = "/home/maya/data/fidmarques/d_export_16.txt"
+    val references16RDD = ctx.parallelize(seq=Seq(getKeysWithOccurences(ctx, filename16)), numSlices=10).cache()
+    //val results16 = parseCandidatesTrigrammeWithReference(candidateLinesRDD, references = references16RDD.first().sortedDescKeyByOccurences)
+    //saveParseCandidatesWithReferences(ctx, results16, "/home/maya/data/fidmarques/resultFrom16.txt")
+    
+    val referencesList = Map(
+        "enseigne4"-> references4RDD.toLocalIterator.toList.head.sortedDescKeyByOccurences,
+        "enseigne16"-> references16RDD.toLocalIterator.toList.head.sortedDescKeyByOccurences
+    )
+    
+    //check which sign best approaches the ticket regarding to its lines (of candidates - products) 
+    val bestSignPerCandidates = candidateLinesRDD.map { line => (line , checkBestProfileSignPerCandidateLine(candidateLine = line, referencesList)) }
+    val groupBySigns = bestSignPerCandidates.groupBy(f => f._2._1, numPartitions=5)
+    val numberPerSigns = groupBySigns.map(f=> (f._1, f._2.toList.size))
+    val totalDistinct = candidateLinesRDD.toLocalIterator.size
+    numberPerSigns.foreach(f=> println(" *** enseigne(%s) - number of candidates/totalDistinct (%s)/(%s)".format(f._1, f._2, totalDistinct)))
+    
+    
     ctx.stop()
   }
 }
