@@ -3,6 +3,7 @@ package com.rv.parser
 import java.io.File
 import scala.annotation.tailrec
 import sys.process._
+import java.util.Date
 
 object ParseFiles {
   
@@ -26,12 +27,16 @@ object ParseFiles {
   }
  
   def getLines(filename : String) = {
-    scala.io.Source.fromFile(filename, "utf-8").getLines.toList
+    scala.io.Source.fromFile(filename, "utf-8").getLines
   }
   
   // a parallel filter lines
-  def filterLines(lines : List[String], pattern : String) = {
-    lines.par.filter { line => line.contains(pattern) }.toList
+  def filterLines(lines : Iterator[String], pattern : String) = {
+    val chunkSize = 128 * 1024
+    val iterator = lines.grouped(chunkSize)
+    val elements = iterator.map { x => x.par.filter { line => line.contains(pattern) }.toList}
+    //no group all list
+    elements.flatten.toList
   }
   
   
@@ -46,9 +51,10 @@ object ParseFiles {
   
   
   def doTask(pathDir : String, pattern : String) = {
+    val start = System.currentTimeMillis
     val filePathsOpt = getFilePaths(pathDir)
     if (filePathsOpt.isDefined) {
-      filePathsOpt.get.map { f => {
+      val totalNumbers  = filePathsOpt.get.map { f => {
         val lines = getLines(filename=f)
         
         //for each list retain only lines with pattern
@@ -62,7 +68,10 @@ object ParseFiles {
         
         //val count = filteredLines.size
         println("logfile %s - pattern(%s) - occurences(%s)".format(f,pattern, count ))
+        count
+        
         } }
+      println("Total numbers of occurence (%s) : (%s) - from (%s) files - duration (%s) ms".format(pattern, totalNumbers.foldLeft(0L)(_+_), totalNumbers.size, (System.currentTimeMillis-start)))
     }else {
       println("No files found!!")
     }
@@ -72,7 +81,7 @@ object ParseFiles {
     //val pathDir = "/home/maya/Downloads/apache-sample-rar_log/access_log"
     //val pathDir = "/home/maya/play_gambling/front_ui/logs"
     val pathDir = "/home/maya/akka-mine-sample"
-      doTask(pathDir, pattern = "de")
+      doTask(pathDir, pattern = "95")
     }
 
 }
